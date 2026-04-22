@@ -1,0 +1,5 @@
+[FilePaths]
+target="C:\Path\To\Targets\"
+sound="C:\Path\To\.wav"
+
+[Settings]
