@@ -13,7 +13,7 @@ fileFound(TargetX, TargetY, MatchedName) {
     ExitApp()
 }
 
-#Include FindText.ahk
+#Include lib/FindText.ahk
 
 Config := LoadConfig()
 if !IsObject(Config)
@@ -29,20 +29,19 @@ CachedTargets := ""
 
 Loop Files TargetFolder "\*.*"
 {
-    CachedTargets .= "|<" A_LoopFileName ">" FindText().GetTextFromFiles(A_LoopFileFullPath)
+    ; FIX 1: Use FindText's native file path syntax. 
+    ; "##50$" tells FindText to load a file with a color tolerance of 50. 
+    ; You can lower this to 10 for stricter matching, or raise it for looser matching.
+    CachedTargets .= "|<" A_LoopFileName ">##50$" A_LoopFileFullPath
 }
 
-
-    ; Search the full screen using CachedTargets. The two 0.1 values are the
-    ; FindText matching thresholds for text/background differences, and the
-    ; trailing 1, 1.5, 0.5 values control the search tolerances/scaling used
-    ; when matching target patterns so detection remains reliable on screen.
 Loop
 {
     Click CoordX " " CoordY
     Sleep sleept
 
-    if (findTextResult := FindText(0, 0, A_ScreenWidth, A_ScreenHeight, 0.1, 0.1, CachedTargets, , , 1, 1.5, 0.5))
+    ; FIX 2: Added &FoundX and &FoundY to the beginning to handle the ByRef coordinate outputs.
+    if (findTextResult := FindText(&FoundX, &FoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, 0.1, 0.1, CachedTargets, , , 1, 1.5, 0.5))
     {
         TargetX := findTextResult[1].x
         TargetY := findTextResult[1].y
@@ -56,11 +55,11 @@ Loop
     Loop Files TargetFolder "\*.*"
     {
         ; The *w-1 *h-1 options ensure the search area is reduced by 1 pixel in width and height to avoid edge artifacts
-        ; The *110 option increases the color variation tolerance to help find matches even if there are minor differences in how the image appears on screen.
-        if ImageSearch(&FoundX, &FoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, "*110 *w-1 *h-1 " A_LoopFileFullPath)
+        ; The *110 option increases the color variation tolerance.
+        if ImageSearch(&ImgFoundX, &ImgFoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, "*110 *w-1 *h-1 " A_LoopFileFullPath)
         {
-            TargetX := FoundX
-            TargetY := FoundY
+            TargetX := ImgFoundX
+            TargetY := ImgFoundY
             MatchedName := A_LoopFileName
             FoundViaBackup := true
             break
