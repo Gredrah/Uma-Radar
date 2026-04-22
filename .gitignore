@@ -2,3 +2,4 @@ config.ini
 test/**
 **.bak
 **_fucked*
+**_compile*
