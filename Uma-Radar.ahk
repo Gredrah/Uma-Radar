@@ -53,6 +53,7 @@ sound := Config.sound
 CoordX := Config.CoordX
 CoordY := Config.CoordY
 sleept := Config.sleept
+jumpBack := Config.jumpBack
 
 ; normalize targets once
 for i, v in TargetArray
@@ -186,10 +187,14 @@ Loop
     {
         ToolTip "Not found. Waiting..."
 
-        MouseGetPos &OrigX, &OrigY
+        if jumpBack
+            MouseGetPos &OrigX, &OrigY
         Click CoordX " " CoordY
-        Sleep 100
-        MouseMove OrigX, OrigY
+        if jumpBack
+        {
+            Sleep 100
+            MouseMove OrigX, OrigY
+        }
     }
 
     Sleep OCR_DELAY
@@ -217,6 +222,7 @@ LoadConfig()
         "CoordX=797`n"
         "CoordY=898`n"
         "sleept=4100`n"
+        "jumpBack=0`n"
         )
 
         FileAppend default, configPath
@@ -245,6 +251,7 @@ LoadConfig()
     CoordX := IniRead(configPath, "Settings", "CoordX", "")
     CoordY := IniRead(configPath, "Settings", "CoordY", "")
     sleept := IniRead(configPath, "Settings", "sleept", "")
+    jumpBack := IniRead(configPath, "Settings", "jumpBack", "0")
 
     if (!IsNumber(CoordX) || !IsNumber(CoordY) || !IsNumber(sleept))
     {
@@ -257,6 +264,7 @@ LoadConfig()
         sound: sound,
         CoordX: CoordX,
         CoordY: CoordY,
-        sleept: sleept
+        sleept: sleept,
+        jumpBack: jumpBack
     }
 }
