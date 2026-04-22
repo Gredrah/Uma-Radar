@@ -6,6 +6,10 @@ Built in AutoHotkey, credit to thqby for their amazing [Rapid OCR Library](https
 
 This script is designed to automatically refresh the Team Trials screen in Umamusume: Pretty Derby until it finds the specified opponents. It uses OCR to read the opponent names from the screen and compares them against a list of target names provided by the user.
 
+## HOTKEYS
+
+- **`F9`: STOP THE SCRIPT**
+
 ## Usage
 
 There are two ways to use this script:
