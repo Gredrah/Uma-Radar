@@ -27,7 +27,7 @@ sleept := Config.sleept
 
 CachedTargets := ""
 
-Loop Files, TargetFolder "\*.*"
+Loop Files TargetFolder "\*.*"
 {
     CachedTargets .= "|<" A_LoopFileName ">" FindText().GetTextFromFiles(A_LoopFileFullPath)
 }
@@ -39,7 +39,7 @@ Loop Files, TargetFolder "\*.*"
     ; when matching target patterns so detection remains reliable on screen.
 Loop
 {
-    Click CoordX ", " CoordY
+    Click CoordX " " CoordY
     Sleep sleept
 
     if (findTextResult := FindText(0, 0, A_ScreenWidth, A_ScreenHeight, 0.1, 0.1, CachedTargets, , , 1, 1.5, 0.5))
@@ -53,7 +53,7 @@ Loop
     }
 
     FoundViaBackup := false
-    Loop Files, TargetFolder "\*.*"
+    Loop Files TargetFolder "\*.*"
     {
         ; The *w-1 *h-1 options ensure the search area is reduced by 1 pixel in width and height to avoid edge artifacts
         ; The *110 option increases the color variation tolerance to help find matches even if there are minor differences in how the image appears on screen.
