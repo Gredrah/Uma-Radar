@@ -187,8 +187,7 @@ Loop
     {
         ToolTip "Not found. Waiting..."
 
-        if jumpBack
-            MouseGetPos &OrigX, &OrigY
+        MouseGetPos &OrigX, &OrigY
         Click CoordX " " CoordY
         if jumpBack
         {
@@ -253,7 +252,7 @@ LoadConfig()
     sleept := IniRead(configPath, "Settings", "sleept", "")
     jumpBack := IniRead(configPath, "Settings", "jumpBack", "0")
 
-    if (!IsNumber(CoordX) || !IsNumber(CoordY) || !IsNumber(sleept))
+    if (!IsNumber(CoordX) || !IsNumber(CoordY) || !IsNumber(sleept) || !IsNumber(jumpBack))
     {
         MsgBox "Invalid numeric values in config.ini", "Error", 16
         return false
