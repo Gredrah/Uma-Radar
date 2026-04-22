@@ -4,6 +4,8 @@ OCR Team Trials Refresh Script for Umamusume: Pretty Derby
 
 Built in AutoHotkey, credit to thqby for their amazing [Rapid OCR Library](https://github.com/thqby/ahk2_lib/tree/master/RapidOcr) and also iseahound for their [ImagePut Library](https://github.com/iseahound/ImagePut).
 
+This script is designed to automatically refresh the Team Trials screen in Umamusume: Pretty Derby until it finds the specified opponents. It uses OCR to read the opponent names from the screen and compares them against a list of target names provided by the user.
+
 ## Usage
 
 There are two ways to use this script:
