@@ -217,7 +217,7 @@ LoadConfig()
         "sound=dat\goldshi-radar.wav`n"
 
         "`n[Settings]`n"
-        "TargetText=example`n"
+        "TargetText=Special Week, Silence Suzuka, Tokai Teio`n"
         "CoordX=797`n"
         "CoordY=898`n"
         "sleept=4100`n"
