@@ -5,16 +5,40 @@ CoordMode "Pixel", "Screen"
 CoordMode "Mouse", "Screen"
 CoordMode "ToolTip", "Screen"
 
+; =========================================================================
+; TUNING VARIABLES (Adjust these to optimize performance)
+; =========================================================================
+
+; 1. Color Tolerance (0 to 255)
+; * 0 requires an exact pixel-perfect match.
+; * 50 allows for slight color variations (shadows, hover states, UI transparency).
+; * Lowering this speeds up the search, but makes it stricter.
+ColorTolerance := 50 
+
+; 2. CPU Throttle (Milliseconds)
+; Gives your processor a tiny break between checking each image. 
+; Prevents the script from freezing your mouse or lagging the system.
+SearchDelay := 10 
+
+; 3. Search Bounding Box (CRITICAL FOR SPEED)
+; Right now, it searches the entire screen. If you know the images will only 
+; ever appear in a specific area (e.g., the right half of the screen), change 
+; these coordinates to create a smaller box. It will search 10x faster!
+SearchX1 := 0
+SearchY1 := 0
+SearchX2 := A_ScreenWidth
+SearchY2 := A_ScreenHeight
+
+; =========================================================================
+
 fileFound(TargetX, TargetY, MatchedName) {
     global sound
-    ToolTip ; Clear any existing tooltips
+    ToolTip ; Clear tooltips
     SoundPlay sound
     TrayTip MatchedName " located!", "Target Found", 1
     MsgBox "Target found at " TargetX ", " TargetY "!"
-    ExitApp() ; Ensures the script completely closes upon success
+    ExitApp()
 }
-
-#Include lib/FindText.ahk
 
 Config := LoadConfig()
 if !IsObject(Config)
@@ -26,83 +50,71 @@ CoordX := Config.CoordX
 CoordY := Config.CoordY
 sleept := Config.sleept
 
-CachedTargets := ""
-FindErrText := 0.15
-FindErrBg := 0.15
-
-; Build the FindText string
+; -------------------------------------------------------------------------
+; PRE-LOAD: Scan the folder ONCE at startup and load paths into RAM.
+; This prevents the script from constantly reading your hard drive.
+; -------------------------------------------------------------------------
+ImagePaths := []
 Loop Files TargetFolder "\*.*"
 {
-    if !(A_LoopFileExt ~= "i)^(png|bmp|jpg|jpeg)$")
-        continue 
-        
-    CachedTargets .= "|<" A_LoopFileName ">##80$" A_LoopFileFullPath
+    if (A_LoopFileExt ~= "i)^(png|bmp|jpg|jpeg)$")
+        ImagePaths.Push(A_LoopFileFullPath)
 }
 
+if (ImagePaths.Length = 0)
+{
+    MsgBox "No valid images (png, bmp, jpg) found in:`n" TargetFolder, "Error", 16
+    ExitApp()
+}
+
+; -------------------------------------------------------------------------
+; MAIN AUTOMATION LOOP
+; -------------------------------------------------------------------------
 Loop
 {
-    ; -------------------------------------------------------------------------
-    ; 1. FINDTEXT SEARCH
-    ; -------------------------------------------------------------------------
-    ToolTip "Searching via FindText..."
+    ToolTip "Scanning for " ImagePaths.Length " images..."
+    FoundMatch := false
+    TargetX := 0
+    TargetY := 0
+    MatchedName := ""
     
-    findTextResult := FindText(&FoundX, &FoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, FindErrText, FindErrBg, CachedTargets)
-    
-    ; ZERO CHECK: Ensure findTextResult is actually an array before parsing
-    if (findTextResult && IsObject(findTextResult))
+    for index, imgPath in ImagePaths
     {
-        TargetX := findTextResult[1].x
-        TargetY := findTextResult[1].y
-        MatchedName := findTextResult[1].id
-
-        fileFound(TargetX, TargetY, MatchedName)
-    }
-    
-
-    ; -------------------------------------------------------------------------
-    ; 2. IMAGESEARCH BACKUP
-    ; -------------------------------------------------------------------------
-    ToolTip "Searching via ImageSearch Backup..."
-    FoundViaBackup := false
-    Loop Files TargetFolder "\*.*"
-    {
-        if !(A_LoopFileExt ~= "i)^(png|bmp|jpg|jpeg)$")
-            continue 
-
-        if ImageSearch(&ImgFoundX, &ImgFoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, "*110 " A_LoopFileFullPath)
+        ; The Tuned ImageSearch Engine
+        if ImageSearch(&ImgFoundX, &ImgFoundY, SearchX1, SearchY1, SearchX2, SearchY2, "*" ColorTolerance " " imgPath)
         {
             TargetX := ImgFoundX
             TargetY := ImgFoundY
-            MatchedName := A_LoopFileName
-            FoundViaBackup := true
+            SplitPath imgPath, &MatchedName ; Cleanly strips the folder path to just get the filename
+            FoundMatch := true
             break
         }
+        Sleep SearchDelay ; Yield CPU
     }
 
-    if (FoundViaBackup)
+    if (FoundMatch)
     {
         fileFound(TargetX, TargetY, MatchedName)
     }
 
-    ; -------------------------------------------------------------------------
-    ; 3. POST-SEARCH CLICK & WAIT
-    ; -------------------------------------------------------------------------
+    ; POST-SEARCH ACTION
     ToolTip "No match found. Clicking and waiting " sleept "ms..."
     
     Click CoordX " " CoordY
-    MouseMove 0, 0, 0 ; Move mouse out of the way so it doesn't block the next search
+    MouseMove 0, 0, 0 ; Move mouse out of the way to prevent hover-state interference
     
     Sleep sleept
 }
 return
 
+; F9 cleanly kills the script at any time
 F9::ExitApp()
 
 LoadConfig()
 {
     if !FileExist("config.ini")
     {
-        MsgBox "Missing configuration file:`nconfig.ini`n`nCreate config.ini with a [FilePaths] section containing target and sound entries.", "Configuration Error", 16
+        MsgBox "Missing configuration file:`nconfig.ini", "Configuration Error", 16
         return false
     }
 
