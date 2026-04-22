@@ -1,42 +1,23 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
+#Include lib/OCR.ahk
 
-CoordMode "Pixel", "Screen"
 CoordMode "Mouse", "Screen"
 CoordMode "ToolTip", "Screen"
 
-; =========================================================================
-; TUNING VARIABLES (Adjust these to optimize performance)
-; =========================================================================
-
-; 1. Color Tolerance (0 to 255)
-; * 0 requires an exact pixel-perfect match.
-; * 50 allows for slight color variations (shadows, hover states, UI transparency).
-; * Lowering this speeds up the search, but makes it stricter.
-ColorTolerance := 50 
-
-; 2. CPU Throttle (Milliseconds)
-; Gives your processor a tiny break between checking each image. 
-; Prevents the script from freezing your mouse or lagging the system.
-SearchDelay := 10 
-
-; 3. Search Bounding Box (CRITICAL FOR SPEED)
-; Right now, it searches the entire screen. If you know the images will only 
-; ever appear in a specific area (e.g., the right half of the screen), change 
-; these coordinates to create a smaller box. It will search 10x faster!
-SearchX1 := 0
-SearchY1 := 0
-SearchX2 := A_ScreenWidth
-SearchY2 := A_ScreenHeight
-
-; =========================================================================
-
+; -------------------------------------------------------------------------
+; SUCCESS FUNCTION
+; -------------------------------------------------------------------------
 fileFound(TargetX, TargetY, MatchedName) {
     global sound
-    ToolTip ; Clear tooltips
+    ToolTip ; Clear any existing tooltips
     SoundPlay sound
     TrayTip MatchedName " located!", "Target Found", 1
-    MsgBox "Target found at " TargetX ", " TargetY "!"
+    
+    ; Move mouse to the text and click it
+    Click TargetX " " TargetY
+    
+    MsgBox "Clicked on " MatchedName "!"
     ExitApp()
 }
 
@@ -44,72 +25,68 @@ Config := LoadConfig()
 if !IsObject(Config)
     ExitApp()
 
-TargetFolder := Config.TargetFolder
+TargetArray := Config.TargetArray 
 sound := Config.sound
 CoordX := Config.CoordX
 CoordY := Config.CoordY
 sleept := Config.sleept
 
-; -------------------------------------------------------------------------
-; PRE-LOAD: Scan the folder ONCE at startup and load paths into RAM.
-; This prevents the script from constantly reading your hard drive.
-; -------------------------------------------------------------------------
-ImagePaths := []
-Loop Files TargetFolder "\*.*"
-{
-    if (A_LoopFileExt ~= "i)^(png|bmp|jpg|jpeg)$")
-        ImagePaths.Push(A_LoopFileFullPath)
-}
-
-if (ImagePaths.Length = 0)
-{
-    MsgBox "No valid images (png, bmp, jpg) found in:`n" TargetFolder, "Error", 16
-    ExitApp()
-}
-
-; -------------------------------------------------------------------------
-; MAIN AUTOMATION LOOP
-; -------------------------------------------------------------------------
 Loop
 {
-    ToolTip "Scanning for " ImagePaths.Length " images..."
+    ToolTip "Scanning screen for text (en-US)..."
+    
+    ; 1. Scan the screen and FORCE the English-US OCR engine
+    ; This drastically improves accuracy on stylized English fonts.
+    try {
+        result := OCR.FromDesktop("en-US")
+    } catch {
+        MsgBox "Error: English OCR language pack is not installed on this Windows system."
+        ExitApp()
+    }
+
+    ; --- OPTIONAL DEBUGGING ---
+    ; Uncomment the line below to see exactly what the OCR engine is reading.
+    ; If it misreads "GoldShip" as "GoidShip", just put "GoidShip" in your config.ini!
+    ; ToolTip "OCR SEES:`n" result.Text, 10, 10 
+    ; --------------------------
+
+    ; 2. Loop through every word in your config.ini array
     FoundMatch := false
-    TargetX := 0
-    TargetY := 0
-    MatchedName := ""
-    
-    for index, imgPath in ImagePaths
+    for index, searchWord in TargetArray
     {
-        ; The Tuned ImageSearch Engine
-        if ImageSearch(&ImgFoundX, &ImgFoundY, SearchX1, SearchY1, SearchX2, SearchY2, "*" ColorTolerance " " imgPath)
+        ; We use InStr to check if your word is anywhere in the massive block of OCR text
+        if InStr(result.Text, searchWord, false) 
         {
-            TargetX := ImgFoundX
-            TargetY := ImgFoundY
-            SplitPath imgPath, &MatchedName ; Cleanly strips the folder path to just get the filename
-            FoundMatch := true
-            break
+            ; Find the exact X/Y pixel coordinates of that specific word
+            targetLocation := result.FindString(searchWord)
+            
+            if (targetLocation)
+            {
+                fileFound(targetLocation.x, targetLocation.y, searchWord)
+                FoundMatch := true
+                break 
+            }
         }
-        Sleep SearchDelay ; Yield CPU
     }
 
-    if (FoundMatch)
-    {
-        fileFound(TargetX, TargetY, MatchedName)
-    }
-
-    ; POST-SEARCH ACTION
-    ToolTip "No match found. Clicking and waiting " sleept "ms..."
+    ; 3. POST-SEARCH CLICK, SNAP RETURN, AND WAIT
+    ToolTip "Targets not found. Clicking backup coordinates and waiting " sleept "ms..."
     
-    Click CoordX " " CoordY
-    MouseMove 0, 0, 0 ; Move mouse out of the way to prevent hover-state interference
+    MouseGetPos &OrigX, &OrigY  
+    Click CoordX " " CoordY     
     
-    Sleep sleept
+    Sleep 100                   
+    MouseMove OrigX, OrigY      
+    
+    Sleep sleept                
 }
 return
 
-; F9 cleanly kills the script at any time
 F9::ExitApp()
 
+; -------------------------------------------------------------------------
+; CONFIG LOADER 
+; -------------------------------------------------------------------------
 LoadConfig()
 {
     if !FileExist("config.ini")
@@ -118,11 +95,18 @@ LoadConfig()
         return false
     }
 
-    TargetFolder := IniRead("config.ini", "FilePaths", "target", "ERROR")
-    if (TargetFolder = "ERROR" || TargetFolder = "" || !InStr(FileExist(TargetFolder), "D"))
+    RawTextString := IniRead("config.ini", "Settings", "TargetText", "ERROR")
+    if (RawTextString = "ERROR" || RawTextString = "")
     {
-        MsgBox "Invalid target folder in config.ini.", "Configuration Error", 16
+        MsgBox "Missing text targets in config.ini.`nPlease add 'TargetText=Word1, Word2' under [Settings].", "Configuration Error", 16
         return false
+    }
+
+    TargetArray := StrSplit(RawTextString, ",")
+    
+    for index, word in TargetArray
+    {
+        TargetArray[index] := Trim(word)
     }
 
     sound := IniRead("config.ini", "FilePaths", "sound", "ERROR")
@@ -143,7 +127,7 @@ LoadConfig()
     }
 
     config := {}
-    config.TargetFolder := TargetFolder
+    config.TargetArray := TargetArray
     config.sound := sound
     config.CoordX := CoordX
     config.CoordY := CoordY
