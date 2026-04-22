@@ -1,136 +1,203 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
-#Include lib/OCR.ahk
 
 CoordMode "Mouse", "Screen"
 CoordMode "ToolTip", "Screen"
+
+; -------------------------------------------------------------------------
+; SETTINGS
+; -------------------------------------------------------------------------
+DEBUG := false          ; set true to see OCR output
+OCR_DELAY := 300        ; delay between OCR scans (ms)
+
+; REGION TO SCAN (IMPORTANT: adjust this!)
+; X, Y, Width, Height
+SCAN_X := 0
+SCAN_Y := 0
+SCAN_W := A_ScreenWidth
+SCAN_H := A_ScreenHeight
+
+; -------------------------------------------------------------------------
+; LOAD LIBRARIES
+; -------------------------------------------------------------------------
+#Include lib\ImagePut.ahk
+#Include lib\RapidOcr.ahk
+
+ToolTip "Warming up OCR engine..."
+try {
+    global ocrEngine := RapidOcr({ modelpath: "lib\models" })
+} catch {
+    MsgBox "Failed to load RapidOcr.`nCheck models + DLLs.", "Error", 16
+    ExitApp()
+}
+ToolTip
+
+; -------------------------------------------------------------------------
+; LOAD CONFIG
+; -------------------------------------------------------------------------
+Config := LoadConfig()
+if !IsObject(Config)
+    ExitApp()
+
+TargetArray := Config.TargetArray
+sound := Config.sound
+CoordX := Config.CoordX
+CoordY := Config.CoordY
+sleept := Config.sleept
+
+; normalize targets once
+for i, v in TargetArray
+    TargetArray[i] := StrLower(Trim(v))
 
 ; -------------------------------------------------------------------------
 ; SUCCESS FUNCTION
 ; -------------------------------------------------------------------------
 fileFound(TargetX, TargetY, MatchedName) {
     global sound
-    ToolTip ; Clear any existing tooltips
+
+    ToolTip
     SoundPlay sound
     TrayTip MatchedName " located!", "Target Found", 1
-    
-    ; Move mouse to the text and click it
+
     Click TargetX " " TargetY
-    
-    MsgBox "Clicked on " MatchedName "!"
+    MsgBox "Clicked on [" MatchedName "]!"
     ExitApp()
 }
 
-Config := LoadConfig()
-if !IsObject(Config)
-    ExitApp()
-
-TargetArray := Config.TargetArray 
-sound := Config.sound
-CoordX := Config.CoordX
-CoordY := Config.CoordY
-sleept := Config.sleept
-
+; -------------------------------------------------------------------------
+; MAIN LOOP
+; -------------------------------------------------------------------------
 Loop
 {
-    ToolTip "Scanning screen for text (en-US)..."
-    
-    ; 1. Scan the screen and FORCE the English-US OCR engine
-    ; This drastically improves accuracy on stylized English fonts.
-    try {
-        result := OCR.FromDesktop("en-US")
-    } catch {
-        MsgBox "Error: English OCR language pack is not installed on this Windows system."
-        ExitApp()
-    }
+    ToolTip "Scanning..."
 
-    ; --- OPTIONAL DEBUGGING ---
-    ; Uncomment the line below to see exactly what the OCR engine is reading.
-    ; If it misreads "GoldShip" as "GoidShip", just put "GoidShip" in your config.ini!
-    ; ToolTip "OCR SEES:`n" result.Text, 10, 10 
-    ; --------------------------
+    ; --- Capture only region ---
+    buf := ImagePutBuffer(0)
 
-    ; 2. Loop through every word in your config.ini array
+    ; --- Build bitmap structure ---
+    st_BF := Buffer(40, 0)
+    NumPut("ptr", buf.ptr
+        , "uint", buf.stride
+        , "uint", buf.width
+        , "uint", buf.height
+        , "uint", 4
+        , "uint", 0
+        , "uint", 0
+        , st_BF)
+
+    ; --- OCR ---
+    ocrResult := ocrEngine.ocr_from_bitmapdata(st_BF, 0, true)
+
     FoundMatch := false
-    for index, searchWord in TargetArray
+
+    if IsObject(ocrResult)
     {
-        ; We use InStr to check if your word is anywhere in the massive block of OCR text
-        if InStr(result.Text, searchWord, false) 
+        for _, block in ocrResult
         {
-            ; Find the exact X/Y pixel coordinates of that specific word
-            targetLocation := result.FindString(searchWord)
-            
-            if (targetLocation)
+            if !IsObject(block)
+                continue
+
+            if !block.HasProp("text")
+                continue
+
+            rawText := block.text
+            cleanText := StrLower(Trim(rawText))
+
+            if DEBUG
             {
-                fileFound(targetLocation.x, targetLocation.y, searchWord)
-                FoundMatch := true
-                break 
+                ToolTip cleanText
+                Sleep 200
+            }
+
+            for _, searchWord in TargetArray
+            {
+                if InStr(cleanText, searchWord)
+                {
+                    if !block.HasProp("boxPoint")
+                        continue
+
+                    ; adjust coordinates back to screen space
+                    sumX := 0, sumY := 0
+
+                    for _, p in block.boxPoint {
+                        sumX += p.x
+                        sumY += p.y
+                    }
+
+                    TargetX := sumX // block.boxPoint.Length + SCAN_X
+                    TargetY := sumY // block.boxPoint.Length + SCAN_Y
+
+                    fileFound(TargetX, TargetY, searchWord)
+                    FoundMatch := true
+                    break 2
+                }
             }
         }
     }
 
-    ; 3. POST-SEARCH CLICK, SNAP RETURN, AND WAIT
-    ToolTip "Targets not found. Clicking backup coordinates and waiting " sleept "ms..."
-    
-    MouseGetPos &OrigX, &OrigY  
-    Click CoordX " " CoordY     
-    
-    Sleep 100                   
-    MouseMove OrigX, OrigY      
-    
-    Sleep sleept                
+    ; ---------------------------------------------------------------------
+    ; OPTIONAL FALLBACK CLICK (disabled by default)
+    ; ---------------------------------------------------------------------
+    if !FoundMatch
+    {
+        ToolTip "Not found. Waiting..."
+
+        MouseGetPos &OrigX, &OrigY
+        Click CoordX " " CoordY
+        Sleep 100
+        MouseMove OrigX, OrigY
+    }
+
+    Sleep OCR_DELAY
 }
 return
 
 F9::ExitApp()
 
 ; -------------------------------------------------------------------------
-; CONFIG LOADER 
+; CONFIG LOADER
 ; -------------------------------------------------------------------------
 LoadConfig()
 {
     if !FileExist("config.ini")
     {
-        MsgBox "Missing configuration file:`nconfig.ini", "Configuration Error", 16
+        MsgBox "Missing config.ini", "Error", 16
         return false
     }
 
-    RawTextString := IniRead("config.ini", "Settings", "TargetText", "ERROR")
-    if (RawTextString = "ERROR" || RawTextString = "")
+    RawText := IniRead("config.ini", "Settings", "TargetText", "")
+    if (RawText = "")
     {
-        MsgBox "Missing text targets in config.ini.`nPlease add 'TargetText=Word1, Word2' under [Settings].", "Configuration Error", 16
+        MsgBox "Missing TargetText in config.ini", "Error", 16
         return false
     }
 
-    TargetArray := StrSplit(RawTextString, ",")
-    
-    for index, word in TargetArray
-    {
-        TargetArray[index] := Trim(word)
-    }
+    TargetArray := StrSplit(RawText, ",")
+    for i, v in TargetArray
+        TargetArray[i] := Trim(v)
 
-    sound := IniRead("config.ini", "FilePaths", "sound", "ERROR")
-    if (sound = "ERROR" || sound = "" || !FileExist(sound) || InStr(FileExist(sound), "D"))
+    sound := IniRead("config.ini", "FilePaths", "sound", "")
+    if (sound = "" || !FileExist(sound))
     {
-        MsgBox "Invalid sound file in config.ini.", "Configuration Error", 16
+        MsgBox "Invalid sound file.", "Error", 16
         return false
     }
 
-    CoordX := IniRead("config.ini", "Settings", "CoordX", "ERROR")
-    CoordY := IniRead("config.ini", "Settings", "CoordY", "ERROR")
-    sleept := IniRead("config.ini", "Settings", "sleept", "ERROR")
+    CoordX := IniRead("config.ini", "Settings", "CoordX", "")
+    CoordY := IniRead("config.ini", "Settings", "CoordY", "")
+    sleept := IniRead("config.ini", "Settings", "sleept", "")
 
     if (!IsNumber(CoordX) || !IsNumber(CoordY) || !IsNumber(sleept))
     {
-        MsgBox "Coordinates or sleep time in config.ini are not valid numbers.", "Configuration Error", 16
+        MsgBox "Invalid numeric values in config.ini", "Error", 16
         return false
     }
 
-    config := {}
-    config.TargetArray := TargetArray
-    config.sound := sound
-    config.CoordX := CoordX
-    config.CoordY := CoordY
-    config.sleept := sleept
-    return config
+    return {
+        TargetArray: TargetArray,
+        sound: sound,
+        CoordX: CoordX,
+        CoordY: CoordY,
+        sleept: sleept
+    }
 }

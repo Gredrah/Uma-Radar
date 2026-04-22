@@ -1,5 +1,8 @@
 [FilePaths]
-target="C:\Path\To\Targets\"
-sound="C:\Path\To\.wav"
+sound=dat\goldshi-radar.wav
 
 [Settings]
+TargetText=Axiestax
+CoordX=797
+CoordY=898
+sleept=4100
