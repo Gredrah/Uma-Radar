@@ -10,7 +10,7 @@ CoordMode "ToolTip", "Screen"
 DEBUG := false          ; set true to see OCR output
 OCR_DELAY := 300        ; delay between OCR scans (ms)
 
-; REGION TO SCAN (IMPORTANT: adjust this!)
+; REGION TO SCAN (Adjust for performance, if you know where the target text appears on screen)
 ; X, Y, Width, Height
 SCAN_X := 0
 SCAN_Y := 0
@@ -35,6 +35,8 @@ ToolTip
 ; -------------------------------------------------------------------------
 ; LOAD CONFIG
 ; -------------------------------------------------------------------------
+configPath := A_ScriptDir "\config.ini"
+
 Config := LoadConfig()
 if !IsObject(Config)
     ExitApp()
@@ -159,13 +161,28 @@ F9::ExitApp()
 ; -------------------------------------------------------------------------
 LoadConfig()
 {
-    if !FileExist("config.ini")
+    global configPath
+
+    if !FileExist(configPath)
     {
-        MsgBox "Missing config.ini", "Error", 16
+        default :=
+        (
+        "[FilePaths]`n"
+        "sound=dat\goldshi-radar.wav`n"
+
+        "`n[Settings]`n"
+        "TargetText=example`n"
+        "CoordX=797`n"
+        "CoordY=898`n"
+        "sleept=4100`n"
+        )
+
+        FileAppend default, configPath
+        MsgBox "Created default config.ini at:`n" configPath "`nPlease edit targets and run the script again.", "Config Created", 64
         return false
     }
 
-    RawText := IniRead("config.ini", "Settings", "TargetText", "")
+    RawText := IniRead(configPath, "Settings", "TargetText", "")
     if (RawText = "")
     {
         MsgBox "Missing TargetText in config.ini", "Error", 16
@@ -176,16 +193,16 @@ LoadConfig()
     for i, v in TargetArray
         TargetArray[i] := Trim(v)
 
-    sound := IniRead("config.ini", "FilePaths", "sound", "")
+    sound := IniRead(configPath, "FilePaths", "sound", "")
     if (sound = "" || !FileExist(sound))
     {
         MsgBox "Invalid sound file.", "Error", 16
         return false
     }
 
-    CoordX := IniRead("config.ini", "Settings", "CoordX", "")
-    CoordY := IniRead("config.ini", "Settings", "CoordY", "")
-    sleept := IniRead("config.ini", "Settings", "sleept", "")
+    CoordX := IniRead(configPath, "Settings", "CoordX", "")
+    CoordY := IniRead(configPath, "Settings", "CoordY", "")
+    sleept := IniRead(configPath, "Settings", "sleept", "")
 
     if (!IsNumber(CoordX) || !IsNumber(CoordY) || !IsNumber(sleept))
     {
