@@ -7,6 +7,8 @@ CoordMode "ToolTip", "Screen"
 ; -------------------------------------------------------------------------
 ; SETTINGS
 ; -------------------------------------------------------------------------
+SetWorkingDir A_ScriptDir
+
 DEBUG := false          ; set true to see OCR output
 OCR_DELAY := 300        ; delay between OCR scans (ms)
 
@@ -20,12 +22,17 @@ SCAN_H := A_ScreenHeight
 ; -------------------------------------------------------------------------
 ; LOAD LIBRARIES
 ; -------------------------------------------------------------------------
+DllCall("SetDefaultDllDirectories", "uint", 0x00001000 | 0x00000800)
+DllCall("AddDllDirectory", "ptr", StrPtr(A_ScriptDir "\lib"))
+
 #Include lib\ImagePut.ahk
 #Include lib\RapidOcr.ahk
 
 ToolTip "Warming up OCR engine..."
 try {
-    global ocrEngine := RapidOcr({ modelpath: "lib\models" })
+    baseDir := A_ScriptFullPath ? RegExReplace(A_ScriptFullPath, "\\[^\\]+$") : A_ScriptDir
+    modelPath := baseDir "\lib\models"
+    global ocrEngine := RapidOcr({ modelpath: modelPath })
 } catch {
     MsgBox "Failed to load RapidOcr.`nCheck models + DLLs.", "Error", 16
     ExitApp()
@@ -89,6 +96,41 @@ Loop
 
     ; --- OCR ---
     ocrResult := ocrEngine.ocr_from_bitmapdata(st_BF, 0, true)
+
+    /* DEBUG: Paginate OCR results if there are many blocks (optional)
+    page := 1
+    pageSize := 10
+
+    total := ocrResult.Length
+    maxPage := Ceil(total / pageSize)
+
+    while true
+    {
+        start := (page - 1) * pageSize + 1
+        end := Min(page * pageSize, total)
+
+        debugText := "OCR Page " page "/" maxPage "`n`n"
+
+        if (end >= start)
+        {
+            Loop (end - start + 1)
+            {
+                i := start + A_Index - 1
+                block := ocrResult[i]
+                if IsObject(block) && block.HasProp("text")
+                    debugText .= i ": " block.text "`n"
+            }
+        }
+
+        choice := MsgBox(debugText "`n`nNext page?", "OCR Debug", "YesNo")
+
+        if (choice = "No")
+            break
+
+        page++
+        if (page > maxPage)
+            break
+    } */
 
     FoundMatch := false
 
