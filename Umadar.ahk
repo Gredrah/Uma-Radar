@@ -7,10 +7,11 @@ CoordMode "ToolTip", "Screen"
 
 fileFound(TargetX, TargetY, MatchedName) {
     global sound
+    ToolTip ; Clear any existing tooltips
     SoundPlay sound
     TrayTip MatchedName " located!", "Target Found", 1
     MsgBox "Target found at " TargetX ", " TargetY "!"
-    ExitApp()
+    ExitApp() ; Ensures the script completely closes upon success
 }
 
 #Include lib/FindText.ahk
@@ -26,37 +27,49 @@ CoordY := Config.CoordY
 sleept := Config.sleept
 
 CachedTargets := ""
+FindErrText := 0.15
+FindErrBg := 0.15
 
+; Build the FindText string
 Loop Files TargetFolder "\*.*"
 {
-    ; FIX 1: Use FindText's native file path syntax. 
-    ; "##50$" tells FindText to load a file with a color tolerance of 50. 
-    ; You can lower this to 10 for stricter matching, or raise it for looser matching.
-    CachedTargets .= "|<" A_LoopFileName ">##50$" A_LoopFileFullPath
+    if !(A_LoopFileExt ~= "i)^(png|bmp|jpg|jpeg)$")
+        continue 
+        
+    CachedTargets .= "|<" A_LoopFileName ">##80$" A_LoopFileFullPath
 }
 
 Loop
 {
-    Click CoordX " " CoordY
-    Sleep sleept
-
-    ; FIX 2: Added &FoundX and &FoundY to the beginning to handle the ByRef coordinate outputs.
-    if (findTextResult := FindText(&FoundX, &FoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, 0.1, 0.1, CachedTargets, , , 1, 1.5, 0.5))
+    ; -------------------------------------------------------------------------
+    ; 1. FINDTEXT SEARCH
+    ; -------------------------------------------------------------------------
+    ToolTip "Searching via FindText..."
+    
+    findTextResult := FindText(&FoundX, &FoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, FindErrText, FindErrBg, CachedTargets)
+    
+    ; ZERO CHECK: Ensure findTextResult is actually an array before parsing
+    if (findTextResult && IsObject(findTextResult))
     {
         TargetX := findTextResult[1].x
         TargetY := findTextResult[1].y
         MatchedName := findTextResult[1].id
 
         fileFound(TargetX, TargetY, MatchedName)
-        ExitApp()
     }
+    
 
+    ; -------------------------------------------------------------------------
+    ; 2. IMAGESEARCH BACKUP
+    ; -------------------------------------------------------------------------
+    ToolTip "Searching via ImageSearch Backup..."
     FoundViaBackup := false
     Loop Files TargetFolder "\*.*"
     {
-        ; The *w-1 *h-1 options ensure the search area is reduced by 1 pixel in width and height to avoid edge artifacts
-        ; The *110 option increases the color variation tolerance.
-        if ImageSearch(&ImgFoundX, &ImgFoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, "*110 *w-1 *h-1 " A_LoopFileFullPath)
+        if !(A_LoopFileExt ~= "i)^(png|bmp|jpg|jpeg)$")
+            continue 
+
+        if ImageSearch(&ImgFoundX, &ImgFoundY, 0, 0, A_ScreenWidth, A_ScreenHeight, "*110 " A_LoopFileFullPath)
         {
             TargetX := ImgFoundX
             TargetY := ImgFoundY
@@ -69,15 +82,17 @@ Loop
     if (FoundViaBackup)
     {
         fileFound(TargetX, TargetY, MatchedName)
-        ExitApp()
     }
 
-    MouseGetPos &MouseX, &MouseY
-    ToolTip "No match found", MouseX + 20, MouseY + 20
-    Sleep 1000
-    ToolTip()
+    ; -------------------------------------------------------------------------
+    ; 3. POST-SEARCH CLICK & WAIT
+    ; -------------------------------------------------------------------------
+    ToolTip "No match found. Clicking and waiting " sleept "ms..."
     
-    Sleep 500
+    Click CoordX " " CoordY
+    MouseMove 0, 0, 0 ; Move mouse out of the way so it doesn't block the next search
+    
+    Sleep sleept
 }
 return
 
@@ -92,49 +107,26 @@ LoadConfig()
     }
 
     TargetFolder := IniRead("config.ini", "FilePaths", "target", "ERROR")
-    if (TargetFolder = "ERROR")
+    if (TargetFolder = "ERROR" || TargetFolder = "" || !InStr(FileExist(TargetFolder), "D"))
     {
-        MsgBox "Missing configuration value:`n[FilePaths] target`n`nPlease add the target entry to config.ini.", "Configuration Error", 16
-        return false
-    }
-
-    if (TargetFolder = "" || !InStr(FileExist(TargetFolder), "D"))
-    {
-        MsgBox "Invalid target folder:`n" TargetFolder "`n`nPlease set [FilePaths] target to an existing directory.", "Configuration Error", 16
+        MsgBox "Invalid target folder in config.ini.", "Configuration Error", 16
         return false
     }
 
     sound := IniRead("config.ini", "FilePaths", "sound", "ERROR")
-    if (sound = "ERROR")
+    if (sound = "ERROR" || sound = "" || !FileExist(sound) || InStr(FileExist(sound), "D"))
     {
-        MsgBox "Missing configuration value:`n[FilePaths] sound`n`nPlease add the sound entry to config.ini.", "Configuration Error", 16
-        return false
-    }
-
-    if (sound = "" || !FileExist(sound) || InStr(FileExist(sound), "D"))
-    {
-        MsgBox "Invalid sound file:`n" sound "`n`nPlease set [FilePaths] sound to an existing sound file.", "Configuration Error", 16
+        MsgBox "Invalid sound file in config.ini.", "Configuration Error", 16
         return false
     }
 
     CoordX := IniRead("config.ini", "Settings", "CoordX", "ERROR")
-    if (CoordX = "ERROR" || !IsNumber(CoordX))
-    {
-        MsgBox "Invalid coordinate value:`n[Settings] CoordX`n`nPlease set [Settings] CoordX to a valid number.", "Configuration Error", 16
-        return false
-    }
-
     CoordY := IniRead("config.ini", "Settings", "CoordY", "ERROR")
-    if (CoordY = "ERROR" || !IsNumber(CoordY))
-    {
-        MsgBox "Invalid coordinate value:`n[Settings] CoordY`n`nPlease set [Settings] CoordY to a valid number.", "Configuration Error", 16
-        return false
-    }
-
     sleept := IniRead("config.ini", "Settings", "sleept", "ERROR")
-    if (sleept = "ERROR" || !IsNumber(sleept))
+
+    if (!IsNumber(CoordX) || !IsNumber(CoordY) || !IsNumber(sleept))
     {
-        MsgBox "Invalid sleep time value:`n[Settings] sleept`n`nPlease set [Settings] sleept to a valid number.", "Configuration Error", 16
+        MsgBox "Coordinates or sleep time in config.ini are not valid numbers.", "Configuration Error", 16
         return false
     }
 
