@@ -74,6 +74,41 @@ fileFound(TargetX, TargetY, MatchedName) {
 }
 
 ; -------------------------------------------------------------------------
+; getRefreshCoordinates get the position of the refresh button by ratio of pixels in the game window, in case of different screen resolutions
+getRefreshCoordinates() {
+    ; .415104166..., .83148148... are the ratios of the refresh button's position relative to the screen height in 1080p, 1440p, and 2160p respectively
+    UmamusumeRefreshRatios := [0.415104166, 0.83148148]
+    X:=0, Y:=0, W:=0, H:=0
+    WinGetPos(&X, &Y, &W, &H, "Umamusume")
+    
+    if (W = 0 || H = 0)
+    {
+        MsgBox "Failed to get game window position. Make sure Umamusume.exe is running.", "Error", 16
+        ExitApp()
+    }
+
+    RefreshX := X + W * UmamusumeRefreshRatios[1]
+    RefreshY := Y + H * UmamusumeRefreshRatios[2]
+
+    return {X: RefreshX, Y: RefreshY}
+}
+
+; -------------------------------------------------------------------------
+; CLICK REFRESH (for when target not found)
+clickOnFail(CoordX, CoordY) {
+    f := 0
+    if (!CoordX || !CoordY) 
+    {
+        CoordX := (pt := getRefreshCoordinates()).X, CoordY := pt.Y
+        f := 1
+    }
+
+    MouseMove CoordX, CoordY
+    Click
+    return f
+}
+
+; -------------------------------------------------------------------------
 ; MAIN LOOP
 ; -------------------------------------------------------------------------
 Loop
@@ -182,7 +217,7 @@ Loop
         ToolTip "Not found. Waiting..."
 
         MouseGetPos &OrigX, &OrigY
-        Click CoordX " " CoordY
+        clickOnFail(CoordX, CoordY)
         if jumpBack
         {
             Sleep 100
@@ -212,10 +247,10 @@ LoadConfig()
 
         "`n[Settings]`n"
         "TargetText=Special Week, Silence Suzuka, Tokai Teio`n"
-        "CoordX=797`n"
-        "CoordY=898`n"
         "sleept=4100`n"
         "jumpBack=0`n"
+        "CoordX=0`n"
+        "CoordY=0`n"
         )
 
         FileAppend default, configPath
@@ -241,8 +276,7 @@ LoadConfig()
         return false
     }
 
-    CoordX := IniRead(configPath, "Settings", "CoordX", "")
-    CoordY := IniRead(configPath, "Settings", "CoordY", "")
+    CoordX := (pt := getRefreshCoordinates()).X, CoordY := pt.Y
     sleept := IniRead(configPath, "Settings", "sleept", "")
     jumpBack := IniRead(configPath, "Settings", "jumpBack", "0")
 
