@@ -9,8 +9,7 @@ CoordMode "ToolTip", "Screen"
 ; -------------------------------------------------------------------------
 SetWorkingDir A_ScriptDir
 
-DEBUG := false          ; set true to see OCR output
-OCR_DELAY := 300        ; delay between OCR scans (ms)
+DEBUG := false  ; Set to true to enable OCR result pagination for debugging
 
 ; REGION TO SCAN (Adjust for performance, if you know where the target text appears on screen)
 ; X, Y, Width, Height
@@ -69,7 +68,7 @@ fileFound(TargetX, TargetY, MatchedName) {
     SoundPlay sound
     TrayTip MatchedName " located!", "Target Found", 1
 
-    Click TargetX " " TargetY
+    MouseMove TargetX, TargetY
     MsgBox "Clicked on [" MatchedName "]!"
     ExitApp()
 }
@@ -98,40 +97,43 @@ Loop
     ; --- OCR ---
     ocrResult := ocrEngine.ocr_from_bitmapdata(st_BF, 0, true)
 
-    /* DEBUG: Paginate OCR results if there are many blocks (optional)
-    page := 1
-    pageSize := 10
-
-    total := ocrResult.Length
-    maxPage := Ceil(total / pageSize)
-
-    while true
+    ; DEBUG: Paginate OCR results if there are many blocks (optional)
+    if (DEBUG)
     {
-        start := (page - 1) * pageSize + 1
-        end := Min(page * pageSize, total)
+        page := 1
+        pageSize := 10
 
-        debugText := "OCR Page " page "/" maxPage "`n`n"
+        total := ocrResult.Length
+        maxPage := Ceil(total / pageSize)
 
-        if (end >= start)
+        while true
         {
-            Loop (end - start + 1)
+            start := (page - 1) * pageSize + 1
+            end := Min(page * pageSize, total)
+
+            debugText := "OCR Page " page "/" maxPage "`n`n"
+
+            if (end >= start)
             {
-                i := start + A_Index - 1
-                block := ocrResult[i]
-                if IsObject(block) && block.HasProp("text")
-                    debugText .= i ": " block.text "`n"
+                Loop (end - start + 1)
+                {
+                    i := start + A_Index - 1
+                    block := ocrResult[i]
+                    if IsObject(block) && block.HasProp("text")
+                        debugText .= i ": " block.text "`n"
+                }
             }
-        }
 
-        choice := MsgBox(debugText "`n`nNext page?", "OCR Debug", "YesNo")
+            choice := MsgBox(debugText "`n`nNext page?", "OCR Debug", "YesNo")
 
-        if (choice = "No")
-            break
+            if (choice = "No")
+                break
 
-        page++
-        if (page > maxPage)
-            break
-    } */
+            page++
+            if (page > maxPage)
+                break
+        } 
+    }
 
     FoundMatch := false
 
@@ -147,12 +149,6 @@ Loop
 
             rawText := block.text
             cleanText := StrLower(Trim(rawText))
-
-            if DEBUG
-            {
-                ToolTip cleanText
-                Sleep 200
-            }
 
             for _, searchWord in TargetArray
             {
@@ -180,9 +176,6 @@ Loop
         }
     }
 
-    ; ---------------------------------------------------------------------
-    ; OPTIONAL FALLBACK CLICK (disabled by default)
-    ; ---------------------------------------------------------------------
     if !FoundMatch
     {
         ToolTip "Not found. Waiting..."
@@ -196,7 +189,7 @@ Loop
         }
     }
 
-    Sleep OCR_DELAY
+    Sleep sleept
 }
 return
 
