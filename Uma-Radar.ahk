@@ -97,7 +97,7 @@ getRefreshCoordinates() {
 ; CLICK REFRESH (for when target not found)
 clickOnFail(CoordX, CoordY) {
     f := 0
-    if (!CoordX || !CoordY) 
+    if (CoordX + CoordY = 0) 
     {
         CoordX := (pt := getRefreshCoordinates()).X, CoordY := pt.Y
         f := 1
