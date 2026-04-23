@@ -14,7 +14,7 @@ There are two ways to use this script:
 
 ### .EXE Method (Quicker)
 
-1. Go to the [releases](https://github.com/Gredrah/Uma-Radar/releases) page and download the latest version of the script. Extract `Uma-Radar.zip` and run `Uma-Radar.exe`.
+1. Go to the [releases](https://github.com/Gredrah/Uma-Radar/releases) page and download the latest version of the script. Extract `Uma-Radar.exe.zip` and run `Uma-Radar.exe`.
 
 2. Run `Uma-Radar.exe` once to create the `config.ini` file. Open `config.ini` and set the `targets` variable to the names of the opponents you want to find, separated by commas. For example:
 
