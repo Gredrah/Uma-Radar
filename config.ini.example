@@ -5,5 +5,5 @@ sound=dat\goldshi-radar.wav
 TargetText=Axiestax
 sleept=4100
 jumpBack=0
-CoordX=
-CoordY=
+CoordX=0
+CoordY=0
