@@ -11,13 +11,6 @@ SetWorkingDir A_ScriptDir
 
 DEBUG := false  ; Set to true to enable OCR result pagination for debugging
 
-; REGION TO SCAN (Adjust for performance, if you know where the target text appears on screen)
-; X, Y, Width, Height
-SCAN_X := 0
-SCAN_Y := 0
-SCAN_W := A_ScreenWidth
-SCAN_H := A_ScreenHeight
-
 ; -------------------------------------------------------------------------
 ; LOAD LIBRARIES
 ; -------------------------------------------------------------------------
@@ -116,7 +109,13 @@ Loop
     ToolTip "Scanning..."
 
     ; --- Capture only region ---
-    buf := ImagePutBuffer(0)
+    hwnd := WinExist("Umamusume")
+    if !hwnd    {
+        MsgBox "Umamusume window not found. Make sure the game is running.", "Error", 16
+        ExitApp()
+    }
+    WinGetPos &capX, &capY, , , "Umamusume"
+    buf := ImagePutBuffer(hwnd)
 
     ; --- Build bitmap structure ---
     st_BF := Buffer(40, 0)
@@ -201,8 +200,8 @@ Loop
                         sumY += p.y
                     }
 
-                    TargetX := sumX // block.boxPoint.Length + SCAN_X
-                    TargetY := sumY // block.boxPoint.Length + SCAN_Y
+                    TargetX := sumX // block.boxPoint.Length + capX
+                    TargetY := sumY // block.boxPoint.Length + capY
 
                     fileFound(TargetX, TargetY, searchWord)
                     FoundMatch := true
