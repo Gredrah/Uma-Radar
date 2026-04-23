@@ -88,17 +88,13 @@ getRefreshCoordinates() {
 
 ; -------------------------------------------------------------------------
 ; CLICK REFRESH (for when target not found)
-clickOnFail(CoordX, CoordY) {
-    f := 0
-    if (CoordX + CoordY = 0) 
-    {
-        CoordX := (pt := getRefreshCoordinates()).X, CoordY := pt.Y
-        f := 1
-    }
+clickOnFail(&CoordX, &CoordY) {
+    pt := getRefreshCoordinates()   ; recompute each time (handles resize/move)
+    CoordX := pt.X
+    CoordY := pt.Y
 
     MouseMove CoordX, CoordY
     Click
-    return f
 }
 
 ; -------------------------------------------------------------------------
@@ -110,11 +106,11 @@ Loop
 
     ; --- Capture only region ---
     hwnd := WinExist("Umamusume")
-    if !hwnd    {
+    if !hwnd {
         MsgBox "Umamusume window not found. Make sure the game is running.", "Error", 16
         ExitApp()
     }
-    WinGetPos &capX, &capY, , , "Umamusume"
+    WinGetPos &capX, &capY, , , "ahk_id " hwnd
     buf := ImagePutBuffer(hwnd)
 
     ; --- Build bitmap structure ---
@@ -216,7 +212,7 @@ Loop
         ToolTip "Not found. Waiting..."
 
         MouseGetPos &OrigX, &OrigY
-        clickOnFail(CoordX, CoordY)
+        clickOnFail(&CoordX, &CoordY)
         if jumpBack
         {
             Sleep 100
