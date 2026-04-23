@@ -46,8 +46,8 @@ The `config.ini` file contains the following settings:
 
 - `TargetText`: A comma-separated list of opponent names to search for. For example: `targets=Special Week, Silence Suzuka, Tokai Teio`
 
-- `CoordX` and `CoordY`: The X and Y coordinates of the location on the screen to be clicked, defaults to the location of the team trials refresh button on 1080p resolution. Adjust these values if you are using a different resolution or if the refresh button is in a different location.
-
 - `sleept`: The amount of time (in milliseconds) to wait between each refresh. Adjust this value if you want the script to refresh more or less frequently. However, the default is roughly how long the image takes to stabilize.
 
 - `jumpBack`: A binary setting (0 or 1) that sets whether to return your mouse to its original position after clicking the refresh button. Set this to 1 if you want the script to move your mouse back to its original position after refreshing, or set it to 0 if you want the mouse to stay on the refresh button.
+
+- `CoordX` and `CoordY`: The X and Y coordinates of the location on the screen to be clicked. If left at the default 0, there is smart co-ordinate detection that will attempt to find the refresh button. However, if you want to set the coordinates manually, you can use a tool like [Window Spy](https://www.autohotkey.com/docs/v2/lib/WindowSpy.htm) to find the coordinates of the refresh button (or anything else, really) and input them into the `config.ini` file.
